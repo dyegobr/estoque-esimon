@@ -104,7 +104,7 @@ create index on public.compras (servico_id);
 
 -- Movimentar um equipamento atualiza onde ele está
 create or replace function public.atualiza_ativo_por_mov() returns trigger
-language plpgsql security invoker set search_path = '' as $$
+language plpgsql security invoker set search_path = '' as $fn$
 declare t text;
 begin
   if new.ativo_id is null or new.destino is null then return new; end if;
@@ -118,7 +118,7 @@ begin
                     when 'BAIXA' then 'BAIXADO' when 'FORNECEDOR' then 'MANUTENCAO' else 'EM_CAMPO' end
   where id = new.ativo_id;
   return new;
-end $$;
+end $fn$;
 
 create trigger trg_mov_ativo after insert on public.movimentacoes
 for each row execute function public.atualiza_ativo_por_mov();
@@ -176,15 +176,33 @@ select id as item_id, grupo, categoria, descricao, marca, modelo, controle, unid
   greatest(0, reservado + estoque_minimo - no_estoque - com_tecnicos - verificar - a_caminho) as comprar
 from base;
 
--- Segurança: só usuários logados (equipe) leem e gravam
-do $$ declare t text; begin
-  foreach t in array array['locais','itens','servicos','ativos','necessidades','movimentacoes','compras'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('create policy "equipe_le" on public.%I for select to authenticated using (true)', t);
-    execute format('create policy "equipe_insere" on public.%I for insert to authenticated with check (true)', t);
-    execute format('create policy "equipe_altera" on public.%I for update to authenticated using (true) with check (true)', t);
-  end loop;
-end $$;
+-- Segurança: só usuários logados leem e gravam (refinado em 0002 para só a equipe)
+alter table public.locais enable row level security;
+alter table public.itens enable row level security;
+alter table public.servicos enable row level security;
+alter table public.ativos enable row level security;
+alter table public.necessidades enable row level security;
+alter table public.movimentacoes enable row level security;
+alter table public.compras enable row level security;
+create policy equipe_le on public.locais for select to authenticated using (true);
+create policy equipe_le on public.itens for select to authenticated using (true);
+create policy equipe_le on public.servicos for select to authenticated using (true);
+create policy equipe_le on public.ativos for select to authenticated using (true);
+create policy equipe_le on public.necessidades for select to authenticated using (true);
+create policy equipe_le on public.movimentacoes for select to authenticated using (true);
+create policy equipe_le on public.compras for select to authenticated using (true);
+create policy equipe_insere on public.locais for insert to authenticated with check (true);
+create policy equipe_insere on public.itens for insert to authenticated with check (true);
+create policy equipe_insere on public.servicos for insert to authenticated with check (true);
+create policy equipe_insere on public.ativos for insert to authenticated with check (true);
+create policy equipe_insere on public.necessidades for insert to authenticated with check (true);
+create policy equipe_insere on public.movimentacoes for insert to authenticated with check (true);
+create policy equipe_insere on public.compras for insert to authenticated with check (true);
+create policy equipe_altera on public.locais for update to authenticated using (true) with check (true);
+create policy equipe_altera on public.itens for update to authenticated using (true) with check (true);
+create policy equipe_altera on public.servicos for update to authenticated using (true) with check (true);
+create policy equipe_altera on public.ativos for update to authenticated using (true) with check (true);
+create policy equipe_altera on public.necessidades for update to authenticated using (true) with check (true);
+create policy equipe_altera on public.compras for update to authenticated using (true) with check (true);
 -- Movimentações são histórico: o app não altera nem apaga
-drop policy "equipe_altera" on public.movimentacoes;
-create policy "equipe_apaga" on public.necessidades for delete to authenticated using (true);
+create policy equipe_apaga on public.necessidades for delete to authenticated using (true);
