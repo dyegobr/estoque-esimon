@@ -14,7 +14,7 @@ export default function Painel() {
     <>
       <div className="topbar">
         <div>
-          <img className="mobile-logo" src="/logo.png" alt="e-Simon" />
+          <img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" />
           <h1>{hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'}, {nomeUsuario.split(' ')[0]}</h1>
           <div className="sub">Situação do estoque agora</div>
         </div>

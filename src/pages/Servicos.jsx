@@ -15,7 +15,7 @@ export default function Servicos({ param }) {
   return (
     <>
       <div className="topbar">
-        <div><img className="mobile-logo" src="/logo.png" alt="e-Simon" /><h1>Serviços</h1><div className="sub">Cada serviço fechado reserva o material que vai usar</div></div>
+        <div><img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" /><h1>Serviços</h1><div className="sub">Cada serviço fechado reserva o material que vai usar</div></div>
         <button className="btn primary" onClick={() => setNovo(true)}><Plus size={17} /> Serviço</button>
       </div>
       <div className="card glass">

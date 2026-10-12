@@ -50,7 +50,7 @@ export default function Ajustes() {
 
   return (
     <>
-      <div className="topbar"><div><img className="mobile-logo" src="/logo.png" alt="e-Simon" /><h1>Ajustes</h1><div className="sub">{me?.nome} · {me?.email}</div></div></div>
+      <div className="topbar"><div><img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" /><h1>Ajustes</h1><div className="sub">{me?.nome} · {me?.email}</div></div></div>
 
       <div className="card glass">
         <h2>Atalhos</h2>

@@ -12,7 +12,7 @@ export default function Equipamentos({ param }) {
   return (
     <>
       <div className="topbar">
-        <div><img className="mobile-logo" src="/logo.png" alt="e-Simon" /><h1>Equipamentos</h1><div className="sub">Onde está cada analisador e ferramenta, com quem e desde quando</div></div>
+        <div><img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" /><h1>Equipamentos</h1><div className="sub">Onde está cada analisador e ferramenta, com quem e desde quando</div></div>
         <button className="btn primary" onClick={() => setNovo(true)}><Plus size={17} /> Equipamento</button>
       </div>
       <div className="card glass">

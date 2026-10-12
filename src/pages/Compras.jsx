@@ -32,7 +32,7 @@ export default function Compras() {
   return (
     <>
       <div className="topbar">
-        <div><img className="mobile-logo" src="/logo.png" alt="e-Simon" /><h1>Compras</h1><div className="sub">Necessidade dos serviços fechados + estoque mínimo − o que tem − o que já foi pedido</div></div>
+        <div><img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" /><h1>Compras</h1><div className="sub">Necessidade dos serviços fechados + estoque mínimo − o que tem − o que já foi pedido</div></div>
       </div>
       <div className="card glass">
         <h2>Comprar agora {sugestoes.length > 0 && <button className="btn small" onClick={copiarLista}><Copy size={15} /> Copiar lista</button>}</h2>

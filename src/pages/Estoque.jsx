@@ -16,7 +16,7 @@ export default function Estoque({ param }) {
   return (
     <>
       <div className="topbar">
-        <div><img className="mobile-logo" src="/logo.png" alt="e-Simon" /><h1>Materiais</h1><div className="sub">Saldo por item, reservado para serviços e o que comprar</div></div>
+        <div><img className="mobile-logo logo-img" src="/logo.png" alt="e-Simon" /><h1>Materiais</h1><div className="sub">Saldo por item, reservado para serviços e o que comprar</div></div>
         <button className="btn primary" onClick={() => setNovo(true)}><Plus size={17} /> Item</button>
       </div>
       <div className="card glass">

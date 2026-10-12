@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { LayoutGrid, Boxes, Gauge, ClipboardList, ShoppingCart, History, Settings, LogOut, ArrowLeftRight } from 'lucide-react'
+import { LayoutGrid, Boxes, Gauge, ClipboardList, ShoppingCart, History, Settings, LogOut, ArrowLeftRight, Sun, Moon } from 'lucide-react'
 import { DataProvider, supabase, useData, ir } from './data.jsx'
 import { ToastProvider } from './ui.jsx'
+import { useTema, BotaoTema } from './theme.jsx'
 import Login from './pages/Login.jsx'
 import Painel from './pages/Painel.jsx'
 import Estoque from './pages/Estoque.jsx'
@@ -28,7 +29,7 @@ function rotaAtual() {
   return { pagina: PAGINAS.find((x) => x.id === p) ? p : 'painel', param: resto.length ? decodeURIComponent(resto.join('/')) : null }
 }
 
-function Shell({ session }) {
+function Shell({ session, tema, alternar }) {
   const { db, erro, me, nomeUsuario } = useData()
   const [rota, setRota] = useState(rotaAtual())
   useEffect(() => {
@@ -43,7 +44,7 @@ function Shell({ session }) {
     return (
       <div className="login">
         <div className="card glass">
-          <img src="/logo.png" alt="e-Simon" />
+          <img className="logo-img" src="/logo.png" alt="e-Simon" />
           <p>O e-mail <b>{session.user.email}</b> ainda não está na equipe. Peça ao administrador para incluir você em Ajustes.</p>
           <button className="btn" onClick={() => supabase.auth.signOut()}>Sair</button>
         </div>
@@ -56,16 +57,18 @@ function Shell({ session }) {
   return (
     <div className="shell">
       <aside className="side glass">
-        <img className="logo" src="/logo.png" alt="e-Simon" />
+        <img className="logo logo-img" src="/logo.png" alt="e-Simon" />
         {PAGINAS.map((p) => (
           <button key={p.id} className={`navbtn ${p.id === rota.pagina ? 'on' : ''}`} onClick={() => ir(p.id)}>
             <p.icone size={19} strokeWidth={1.9} /> {p.nome}
           </button>
         ))}
         <div className="spacer" />
+        <button className="navbtn" onClick={alternar}>{tema === 'light' ? <Moon size={19} /> : <Sun size={19} />} {tema === 'light' ? 'Tema escuro' : 'Tema claro'}</button>
         <div className="me">{nomeUsuario}</div>
         <button className="navbtn" onClick={() => supabase.auth.signOut()}><LogOut size={19} /> Sair</button>
       </aside>
+      <BotaoTema tema={tema} alternar={alternar} className="theme-fab" />
       <main className="main">
         <P param={rota.param} />
       </main>
@@ -83,6 +86,7 @@ function Shell({ session }) {
 
 export default function App() {
   const [session, setSession] = useState(undefined)
+  const [tema, alternar] = useTema()
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
@@ -93,8 +97,8 @@ export default function App() {
     <ToastProvider>
       <div className="backdrop"><div className="blob b1" /><div className="blob b2" /><div className="blob b3" /></div>
       {session === undefined ? <div className="spin" /> : session ? (
-        <DataProvider session={session} key={session.user.id}><Shell session={session} /></DataProvider>
-      ) : <Login />}
+        <DataProvider session={session} key={session.user.id}><Shell session={session} tema={tema} alternar={alternar} /></DataProvider>
+      ) : <><BotaoTema tema={tema} alternar={alternar} className="theme-fab always" /><Login /></>}
     </ToastProvider>
   )
 }

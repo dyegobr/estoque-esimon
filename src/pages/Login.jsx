@@ -25,7 +25,7 @@ export default function Login() {
   return (
     <div className="login">
       <form className="card glass" onSubmit={enviar}>
-        <img src="/logo.png" alt="e-Simon" />
+        <img className="logo-img" src="/logo.png" alt="e-Simon" />
         <p>Controle de estoque e equipamentos</p>
         <label>E-mail<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
         {modo !== 'senha' && (
