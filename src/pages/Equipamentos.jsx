@@ -33,6 +33,7 @@ export default function Equipamentos({ param }) {
                   {a.status === 'VERIFICAR' ? 'Local não informado, toque para registrar' :
                     [local[a.local_id]?.nome, servico[a.servico_id]?.cliente, a.responsavel, desde(a.desde)].filter(Boolean).join(' · ')}
                   {a.calibracao_validade && ` · calibração até ${fmtData(a.calibracao_validade)}`}
+                  {a.garantia_ate && ` · garantia até ${fmtData(a.garantia_ate)}`}
                 </div>
               </div>
               <Status v={a.status} />
@@ -52,7 +53,14 @@ function DetalheAtivo({ id, onClose }) {
   const a = db.ativos.find((x) => x.id === id)
   if (!a) return null
   const movs = db.movs.filter((m) => m.ativo_id === id)
+  if (acao === 'EDITAR') return <EditarAtivo ativo={a} onClose={() => setAcao(null)} />
   if (acao) return <MoverAtivo ativo={a} acao={acao} onClose={() => setAcao(null)} />
+  const vencida = a.garantia_ate && new Date(a.garantia_ate) < new Date()
+  const ficha = [
+    ['Nº de série', a.numero_serie], ['Fornecedor', a.fornecedor], ['Nota fiscal', a.nota_fiscal],
+    ['Data da compra', fmtData(a.data_compra)], ['Garantia até', a.garantia_ate && `${fmtData(a.garantia_ate)}${vencida ? ' (vencida)' : ''}`],
+    ['Calibração até', fmtData(a.calibracao_validade)], ['Observação', a.obs],
+  ].filter(([, v]) => v)
   return (
     <Modal titulo={`${item[a.item_id]?.descricao}`} sub={`${a.id}${a.numero_serie ? ' · série ' + a.numero_serie : ''}`} onClose={onClose}
       acoes={<button className="btn" onClick={onClose}>Fechar</button>}>
@@ -68,6 +76,12 @@ function DetalheAtivo({ id, onClose }) {
         {a.status !== 'DISPONIVEL' && <button className="btn" onClick={() => setAcao(a.status === 'VERIFICAR' ? 'AJUSTE_INVENTARIO' : a.status === 'MANUTENCAO' ? 'RETORNO_MANUTENCAO' : 'DEVOLUCAO')}>Devolver ao armário</button>}
         {a.status !== 'MANUTENCAO' && <button className="btn" onClick={() => setAcao('ENVIO_MANUTENCAO')}>Manutenção</button>}
         <button className="btn" onClick={() => setAcao('TRANSFERENCIA')}>Outro local</button>
+        <button className="btn" onClick={() => setAcao('EDITAR')}>Editar dados</button>
+      </div>
+      <h4 className="muted" style={{ margin: '14px 0 6px' }}>Ficha</h4>
+      <div className="list">
+        {ficha.length === 0 && <div className="empty">Sem nº de série, nota fiscal ou garantia. Toque em Editar dados para preencher.</div>}
+        {ficha.map(([k, v]) => <div key={k} className="row" style={{ padding: '8px 4px' }}><div className="grow s" style={{ marginTop: 0 }}>{k}</div><div style={{ fontWeight: 550, color: k === 'Garantia até' && vencida ? 'var(--bad)' : undefined }}>{v}</div></div>)}
       </div>
       <h4 className="muted" style={{ margin: '14px 0 6px' }}>Histórico de usos</h4>
       <div className="list">
@@ -124,15 +138,43 @@ function MoverAtivo({ ativo, acao, onClose }) {
   )
 }
 
+function EditarAtivo({ ativo, onClose }) {
+  const { load } = useData()
+  const toast = useToast()
+  const campos = ['numero_serie', 'fornecedor', 'nota_fiscal', 'data_compra', 'garantia_ate', 'calibracao_validade', 'obs']
+  const [f, setF] = useState(Object.fromEntries(campos.map((k) => [k, ativo[k] || ''])))
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  async function salvar() {
+    const dados = Object.fromEntries(campos.map((k) => [k, ['data_compra', 'garantia_ate', 'calibracao_validade'].includes(k) ? f[k] || null : f[k]]))
+    const r = await supabase.from('ativos').update(dados).eq('id', ativo.id)
+    if (r.error) return toast(r.error.message, true)
+    toast('Dados salvos'); await load(); onClose()
+  }
+  return (
+    <Modal titulo="Editar equipamento" sub={ativo.id} onClose={onClose}
+      acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" onClick={salvar}>Salvar</button></>}>
+      <div className="form">
+        <label>Nº de série<input value={f.numero_serie} onChange={set('numero_serie')} /></label>
+        <label>Fornecedor<input value={f.fornecedor} onChange={set('fornecedor')} /></label>
+        <label>Nº da nota fiscal<input value={f.nota_fiscal} onChange={set('nota_fiscal')} /></label>
+        <label>Data da compra / NF<input type="date" value={f.data_compra} onChange={set('data_compra')} /></label>
+        <label>Garantia até<input type="date" value={f.garantia_ate} onChange={set('garantia_ate')} /></label>
+        <label>Calibração válida até<input type="date" value={f.calibracao_validade} onChange={set('calibracao_validade')} /></label>
+        <label className="full">Observação<input value={f.obs} onChange={set('obs')} /></label>
+      </div>
+    </Modal>
+  )
+}
+
 function NovoAtivo({ onClose }) {
   const { db, load, nomeUsuario } = useData()
   const toast = useToast()
   const tipos = db.itens.filter((i) => i.controle === 'SERIAL')
-  const [f, setF] = useState({ item_id: tipos[0]?.id || '', id: '', numero_serie: '', local: 'ARMARIO', calibracao_validade: '' })
+  const [f, setF] = useState({ item_id: tipos[0]?.id || '', id: '', numero_serie: '', local: 'ARMARIO', calibracao_validade: '', fornecedor: '', nota_fiscal: '', data_compra: '', garantia_ate: '' })
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   async function salvar() {
     const id = f.id.trim().toUpperCase()
-    const r = await supabase.from('ativos').insert({ id, item_id: f.item_id, numero_serie: f.numero_serie, calibracao_validade: f.calibracao_validade || null, status: 'VERIFICAR' })
+    const r = await supabase.from('ativos').insert({ id, item_id: f.item_id, numero_serie: f.numero_serie, calibracao_validade: f.calibracao_validade || null, status: 'VERIFICAR', fornecedor: f.fornecedor, nota_fiscal: f.nota_fiscal, data_compra: f.data_compra || null, garantia_ate: f.garantia_ate || null })
     if (r.error) return toast(r.error.message, true)
     await supabase.from('movimentacoes').insert({ tipo: 'AJUSTE_INVENTARIO', item_id: f.item_id, ativo_id: id, qtd: 1, destino: f.local, responsavel: nomeUsuario, obs: 'Cadastro' })
     toast('Equipamento cadastrado'); await load(); onClose()
@@ -146,6 +188,10 @@ function NovoAtivo({ onClose }) {
         <label>Nº de série<input value={f.numero_serie} onChange={set('numero_serie')} /></label>
         <label>Local<select value={f.local} onChange={set('local')}>{db.locais.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></label>
         <label>Calibração válida até<input type="date" value={f.calibracao_validade} onChange={set('calibracao_validade')} /></label>
+        <label>Fornecedor<input value={f.fornecedor} onChange={set('fornecedor')} /></label>
+        <label>Nº da nota fiscal<input value={f.nota_fiscal} onChange={set('nota_fiscal')} /></label>
+        <label>Data da compra / NF<input type="date" value={f.data_compra} onChange={set('data_compra')} /></label>
+        <label>Garantia até<input type="date" value={f.garantia_ate} onChange={set('garantia_ate')} /></label>
       </div>
       <div className="tiny" style={{ marginTop: 10 }}>Tipo novo de equipamento? Cadastre antes em Materiais &gt; Item, grupo Equipamento.</div>
     </Modal>

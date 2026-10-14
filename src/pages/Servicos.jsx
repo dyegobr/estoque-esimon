@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Plus, Trash2, CheckCircle2, AlertTriangle, Truck, Undo2 } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, AlertTriangle, Truck, Undo2, Printer, Pencil } from 'lucide-react'
 import { useData, ir, supabase, sugerirTC, proximoIdServico, fmtData, desde } from '../data.jsx'
 import { Modal, Status, useToast } from '../ui.jsx'
 
 const ABERTOS = ['ORCAMENTO', 'FECHADO', 'AGENDADO', 'EM_CAMPO']
 const PENDENTE = ['PLANEJADO', 'RESERVADO', 'SEPARADO']
+export const TIPOS_SERV = { MONITORAMENTO: 'Monitoramento', ELETROPOSTO: 'Eletroposto', OUTRO: 'Outro' }
+const hoje = () => new Date().toISOString().slice(0, 10)
 
 export default function Servicos({ param }) {
   const { db } = useData()
@@ -41,7 +43,7 @@ function LinhaServico({ s }) {
     <div className="row click" onClick={() => ir('servicos', s.id)}>
       <div className="grow">
         <div className="t">{s.cliente}</div>
-        <div className="s">{s.id}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {chk.length} itens{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
+        <div className="s">{s.id}{s.tipo && s.tipo !== 'MONITORAMENTO' ? ` · ${TIPOS_SERV[s.tipo]}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {chk.length} itens{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
       </div>
       {ABERTOS.includes(s.status) && chk.length > 0 && (faltam ? <AlertTriangle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#34d399" />)}
       <Status v={s.status} />
@@ -90,7 +92,7 @@ function DetalheServico({ id }) {
   const faltam = chk.filter((c) => c.falta > 0)
 
   async function mudarStatus(st) {
-    const r = await supabase.from('servicos').update({ status: st }).eq('id', id)
+    const r = await supabase.from('servicos').update({ status: st, ...(st === 'CONCLUIDO' && !s.data_instalacao ? { data_instalacao: hoje() } : {}) }).eq('id', id)
     if (r.error) return toast(r.error.message, true)
     await load()
   }
@@ -106,12 +108,18 @@ function DetalheServico({ id }) {
         <div>
           <button className="btn ghost small" style={{ marginLeft: -12 }} onClick={() => ir('servicos')}>‹ Serviços</button>
           <h1>{s.cliente}</h1>
-          <div className="sub">{s.id}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}</div>
+          <div className="sub">{s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}</div>
         </div>
-        <select value={s.status} onChange={(e) => mudarStatus(e.target.value)} style={{ width: 'auto' }}>
-          {['ORCAMENTO', 'FECHADO', 'AGENDADO', 'EM_CAMPO', 'CONCLUIDO', 'CANCELADO'].map((x) => <option key={x} value={x}>{{ ORCAMENTO: 'Orçamento', FECHADO: 'Fechado', AGENDADO: 'Agendado', EM_CAMPO: 'Em campo', CONCLUIDO: 'Concluído', CANCELADO: 'Cancelado' }[x]}</option>)}
-        </select>
+        <div className="btns">
+          <button className="btn small" onClick={() => setModal('editar')}><Pencil size={15} /> Editar</button>
+          <button className="btn small" onClick={() => window.print()}><Printer size={15} /> Imprimir lista</button>
+          <select value={s.status} onChange={(e) => mudarStatus(e.target.value)} style={{ width: 'auto' }}>
+            {['ORCAMENTO', 'FECHADO', 'AGENDADO', 'EM_CAMPO', 'CONCLUIDO', 'CANCELADO'].map((x) => <option key={x} value={x}>{{ ORCAMENTO: 'Orçamento', FECHADO: 'Fechado', AGENDADO: 'Agendado', EM_CAMPO: 'Em campo', CONCLUIDO: 'Concluído', CANCELADO: 'Cancelado' }[x]}</option>)}
+          </select>
+        </div>
       </div>
+
+      <ListaImpressao s={s} nec={nec} equip={db.ativos.filter((a) => a.servico_id === id)} />
 
       <div className="card glass">
         <h2 style={{ flexWrap: 'wrap' }}>
@@ -151,7 +159,7 @@ function DetalheServico({ id }) {
       )}
 
       <div className="card glass">
-        <h2>Pontos de medição <button className="btn small" onClick={() => setModal('linha')}><Plus size={15} /> Material</button></h2>
+        <h2>{s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais do serviço' : 'Pontos de medição'} <button className="btn small" onClick={() => setModal('linha')}><Plus size={15} /> Material</button></h2>
         <div className="list">
           {pontos.length === 0 && <div className="empty">Sem pontos cadastrados.</div>}
           {pontos.map((p) => (
@@ -174,6 +182,7 @@ function DetalheServico({ id }) {
       {modal === 'saida' && <Saida s={s} chk={chk} onClose={() => setModal(null)} />}
       {modal === 'retorno' && <Retorno s={s} campo={campo} equip={equipCampo} onClose={() => setModal(null)} />}
       {modal === 'linha' && <NovaLinha s={s} onClose={() => setModal(null)} />}
+      {modal === 'editar' && <EditarServico s={s} onClose={() => setModal(null)} />}
     </>
   )
 }
@@ -273,6 +282,7 @@ function Retorno({ s, campo, equip, onClose }) {
   const [inst, setInst] = useState(Object.fromEntries(campo.map((c) => [c.item_id, c.qtd])))
   const [volta, setVolta] = useState(equip.map((a) => a.id))
   const [concluir, setConcluir] = useState(true)
+  const [dataInst, setDataInst] = useState(hoje())
   const [ocupado, setOcupado] = useState(false)
 
   async function salvar() {
@@ -291,7 +301,7 @@ function Retorno({ s, campo, equip, onClose }) {
     if (!r.error) {
       const instalados = Object.keys(inst).filter((k) => Number(inst[k]) > 0)
       if (instalados.length) r = await supabase.from('necessidades').update({ status: 'INSTALADO' }).eq('servico_id', s.id).eq('status', 'SEPARADO').in('item_id', instalados)
-      if (!r.error && concluir) r = await supabase.from('servicos').update({ status: 'CONCLUIDO' }).eq('id', s.id)
+      if (!r.error && concluir) r = await supabase.from('servicos').update({ status: 'CONCLUIDO', data_instalacao: dataInst || null }).eq('id', s.id)
     }
     setOcupado(false)
     if (r.error) return toast(r.error.message, true)
@@ -325,6 +335,7 @@ function Retorno({ s, campo, equip, onClose }) {
         <input type="checkbox" style={{ width: 20, height: 20 }} checked={concluir} onChange={(e) => setConcluir(e.target.checked)} />
         <span>Marcar serviço como concluído</span>
       </label>
+      {concluir && <div className="form" style={{ marginTop: 8 }}><label>Data da instalação<input type="date" value={dataInst} onChange={(e) => setDataInst(e.target.value)} /></label></div>}
     </Modal>
   )
 }
@@ -350,39 +361,104 @@ function NovaLinha({ s, onClose }) {
   )
 }
 
+function EditarServico({ s, onClose }) {
+  const { load } = useData()
+  const toast = useToast()
+  const [f, setF] = useState({ cliente: s.cliente || '', endereco: s.endereco || '', tipo: s.tipo || 'MONITORAMENTO', data_prevista_campo: s.data_prevista_campo || '', data_instalacao: s.data_instalacao || '' })
+  async function salvar() {
+    const r = await supabase.from('servicos').update({ ...f, data_prevista_campo: f.data_prevista_campo || null, data_instalacao: f.data_instalacao || null }).eq('id', s.id)
+    if (r.error) return toast(r.error.message, true)
+    toast('Serviço atualizado'); await load(); onClose()
+  }
+  return (
+    <Modal titulo="Editar serviço" sub={s.id} onClose={onClose}
+      acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.cliente} onClick={salvar}>Salvar</button></>}>
+      <div className="form">
+        <label>Cliente / condomínio<input value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} /></label>
+        <label>Tipo<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{Object.entries(TIPOS_SERV).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
+        <label className="full">Endereço<input value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /></label>
+        <label>Data prevista de campo<input type="date" value={f.data_prevista_campo} onChange={(e) => setF({ ...f, data_prevista_campo: e.target.value })} /></label>
+        <label>Data da instalação<input type="date" value={f.data_instalacao} onChange={(e) => setF({ ...f, data_instalacao: e.target.value })} /></label>
+      </div>
+    </Modal>
+  )
+}
+
+// Só aparece na impressão: checklist de materiais e equipamentos para conferir na saída e no retorno
+function ListaImpressao({ s, nec, equip }) {
+  const { item } = useData()
+  const porItem = {}
+  for (const n of nec.filter((x) => x.status !== 'CANCELADO')) porItem[n.item_id] = (porItem[n.item_id] || 0) + n.qtd
+  return (
+    <div className="print-area">
+      <img src="/logo-dark.png" alt="e-Simon" style={{ height: 36 }} />
+      <h2>Lista de materiais e equipamentos</h2>
+      <p><b>{s.cliente}</b> · {s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}<br />
+        {s.endereco}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}</p>
+      <table>
+        <thead><tr><th>Material</th><th>Qtd</th><th>Saiu</th><th>Instalado</th><th>Voltou</th></tr></thead>
+        <tbody>
+          {Object.entries(porItem).map(([id, q]) => <tr key={id}><td>{item[id]?.descricao || id}</td><td>{q}</td><td>☐</td><td>____</td><td>____</td></tr>)}
+          {Object.keys(porItem).length === 0 && <tr><td colSpan={5}>Nenhum material cadastrado.</td></tr>}
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Equipamento</th><th>Nº de série</th><th>Saiu</th><th>Voltou</th></tr></thead>
+        <tbody>
+          {equip.map((a) => <tr key={a.id}><td>{item[a.item_id]?.descricao}</td><td>{a.numero_serie || a.id}</td><td>☐</td><td>☐</td></tr>)}
+          {[0, 1, 2].map((k) => <tr key={'v' + k}><td>&nbsp;</td><td></td><td>☐</td><td>☐</td></tr>)}
+        </tbody>
+      </table>
+      <p className="assina">Técnico: ______________________ &nbsp; Data: ___/___/_____ &nbsp; Conferido por: ______________________</p>
+    </div>
+  )
+}
+
 function NovoServico({ onClose }) {
   const { db, item, load } = useData()
   const toast = useToast()
-  const [f, setF] = useState({ cliente: '', endereco: '', data_prevista_campo: '', status: 'FECHADO' })
-  const [pontos, setPontos] = useState([{ ponto: 'GERAL', disj: '', geral: true, tc: '', ie: true }])
+  const [f, setF] = useState({ cliente: '', endereco: '', data_prevista_campo: '', status: 'FECHADO', tipo: 'MONITORAMENTO' })
+  const [pontos, setPontos] = useState([{ ponto: 'GERAL', disj: '', geral: true, tc: '', ie: true, dj: false, reset: false }])
+  const [extras, setExtras] = useState([])
   const [ocupado, setOcupado] = useState(false)
   const tcs = db.itens.filter((i) => i.categoria === 'TC')
+  const materiais = db.itens.filter((i) => i.controle === 'QTD' && i.ativo !== false)
+  const comPontos = f.tipo === 'MONITORAMENTO'
 
-  const linhas = useMemo(() => pontos.map((p) => ({ ...p, tcFinal: p.tc || (p.disj ? sugerirTC(p.disj, p.geral) : '') })), [pontos])
+  const linhas = useMemo(() => (comPontos ? pontos : []).map((p) => ({ ...p, tcFinal: p.tc || (p.disj ? sugerirTC(p.disj, p.geral) : '') })), [pontos, comPontos])
   const resumo = useMemo(() => {
     const r = {}
+    const soma = (id, q) => { if (id && q > 0) r[id] = (r[id] || 0) + q }
     for (const p of linhas) {
-      if (p.tcFinal) r[p.tcFinal] = (r[p.tcFinal] || 0) + 3
-      if (p.ie) r['MED-IE-SM3W'] = (r['MED-IE-SM3W'] || 0) + 1
+      if (p.tcFinal) soma(p.tcFinal, 3)
+      if (p.ie) soma('MED-IE-SM3W', 1)
+      if (p.dj) soma('DISJ', 1)
+      if (p.reset) soma('RESET', 1)
     }
+    for (const e of extras) soma(e.item_id, Number(e.qtd))
     return Object.entries(r).map(([id, q]) => {
       const s = db.saldo.find((x) => x.item_id === id)
       return { id, q, livre: s ? s.disponivel : 0 }
     })
-  }, [linhas, db.saldo])
+  }, [linhas, extras, db.saldo])
 
   const setP = (i, k, v) => setPontos(pontos.map((p, j) => (j === i ? { ...p, [k]: v, ...(k === 'disj' || k === 'geral' ? { tc: '' } : {}) } : p)))
+  const setE = (i, k, v) => setExtras(extras.map((e, j) => (j === i ? { ...e, [k]: v } : e)))
 
   async function salvar() {
     setOcupado(true)
     const id = await proximoIdServico()
-    let r = await supabase.from('servicos').insert({ id, ...f, data_prevista_campo: f.data_prevista_campo || null, data_fechamento: new Date().toISOString().slice(0, 10) })
+    let r = await supabase.from('servicos').insert({ id, ...f, data_prevista_campo: f.data_prevista_campo || null, data_fechamento: hoje() })
     if (!r.error) {
       const nec = []
       for (const p of linhas) {
-        if (p.tcFinal) nec.push({ servico_id: id, ponto: p.ponto, disjuntor_a: Number(p.disj) || null, item_id: p.tcFinal, qtd: 3 })
-        if (p.ie) nec.push({ servico_id: id, ponto: p.ponto, disjuntor_a: Number(p.disj) || null, item_id: 'MED-IE-SM3W', qtd: 1 })
+        const base = { servico_id: id, ponto: p.ponto, disjuntor_a: Number(p.disj) || null }
+        if (p.tcFinal) nec.push({ ...base, item_id: p.tcFinal, qtd: 3 })
+        if (p.ie) nec.push({ ...base, item_id: 'MED-IE-SM3W', qtd: 1 })
+        if (p.dj) nec.push({ ...base, item_id: 'DISJ', qtd: 1 })
+        if (p.reset) nec.push({ ...base, item_id: 'RESET', qtd: 1 })
       }
+      for (const e of extras) if (e.item_id && Number(e.qtd) > 0) nec.push({ servico_id: id, ponto: comPontos ? 'GERAL' : f.tipo, item_id: e.item_id, qtd: Number(e.qtd) })
       if (nec.length) r = await supabase.from('necessidades').insert(nec)
     }
     setOcupado(false)
@@ -390,39 +466,59 @@ function NovoServico({ onClose }) {
     toast('Serviço criado'); await load(); onClose(); ir('servicos', id)
   }
 
+  const chk = (p, i, k, txt) => <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 18, height: 18 }} checked={!!p[k]} onChange={(e) => setP(i, k, e.target.checked)} />{txt}</label>
+
   return (
-    <Modal titulo="Novo serviço" sub="O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima." onClose={onClose}
+    <Modal titulo="Novo serviço" sub={comPontos ? 'O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima.' : 'Liste o material que o serviço vai usar.'} onClose={onClose}
       acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.cliente || ocupado} onClick={salvar}>Criar serviço</button></>}>
       <div className="form">
         <label>Cliente / condomínio<input value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} /></label>
+        <label>Tipo de serviço<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{Object.entries(TIPOS_SERV).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
         <label>Data prevista de campo<input type="date" value={f.data_prevista_campo} onChange={(e) => setF({ ...f, data_prevista_campo: e.target.value })} /></label>
-        <label>Endereço<input value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /></label>
         <label>Situação<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="ORCAMENTO">Orçamento (não reserva)</option><option value="FECHADO">Fechado</option><option value="AGENDADO">Agendado</option></select></label>
+        <label className="full">Endereço<input value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /></label>
       </div>
-      <h4 className="muted" style={{ margin: '16px 0 4px' }}>Pontos de medição</h4>
+      {comPontos && <>
+        <h4 className="muted" style={{ margin: '16px 0 4px' }}>Pontos de medição</h4>
+        <div className="list">
+          {linhas.map((p, i) => (
+            <div key={i} className="row" style={{ flexWrap: 'wrap' }}>
+              <input style={{ flex: '1 1 120px' }} value={p.ponto} placeholder="Ponto" onChange={(e) => setP(i, 'ponto', e.target.value)} />
+              <input style={{ width: 96 }} type="number" placeholder="Disj. A" value={p.disj} onChange={(e) => setP(i, 'disj', e.target.value)} />
+              <select style={{ flex: '1 1 170px' }} value={p.tcFinal} onChange={(e) => setP(i, 'tc', e.target.value)}>
+                <option value="">TC</option>{tcs.map((t) => <option key={t.id} value={t.id}>{t.descricao}</option>)}
+              </select>
+              {chk(p, i, 'geral', 'Geral')}
+              {chk(p, i, 'ie', 'Medidor IE')}
+              {chk(p, i, 'dj', 'Disjuntor')}
+              {chk(p, i, 'reset', 'Reset')}
+              <button className="btn ghost small" onClick={() => setPontos(pontos.filter((_, j) => j !== i))} aria-label="Remover"><Trash2 size={15} /></button>
+            </div>
+          ))}
+        </div>
+        <div className="btns" style={{ marginTop: 8 }}>
+          <button className="btn small" onClick={() => setPontos([...pontos, { ponto: `MED-${pontos.length}`, disj: pontos.at(-1)?.geral ? '' : pontos.at(-1)?.disj || '', geral: false, tc: '', ie: true, dj: false, reset: false }])}><Plus size={15} /> Ponto</button>
+        </div>
+      </>}
+      <h4 className="muted" style={{ margin: '16px 0 4px' }}>{comPontos ? 'Outros materiais' : 'Materiais'}</h4>
       <div className="list">
-        {linhas.map((p, i) => (
-          <div key={i} className="row" style={{ flexWrap: 'wrap' }}>
-            <input style={{ flex: '1 1 120px' }} value={p.ponto} placeholder="Ponto" onChange={(e) => setP(i, 'ponto', e.target.value)} />
-            <input style={{ width: 96 }} type="number" placeholder="Disj. A" value={p.disj} onChange={(e) => setP(i, 'disj', e.target.value)} />
-            <select style={{ flex: '1 1 170px' }} value={p.tcFinal} onChange={(e) => setP(i, 'tc', e.target.value)}>
-              <option value="">TC</option>{tcs.map((t) => <option key={t.id} value={t.id}>{t.descricao}</option>)}
-            </select>
-            <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 18, height: 18 }} checked={p.geral} onChange={(e) => setP(i, 'geral', e.target.checked)} />Geral</label>
-            <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 18, height: 18 }} checked={p.ie} onChange={(e) => setP(i, 'ie', e.target.checked)} />Medidor IE</label>
-            <button className="btn ghost small" onClick={() => setPontos(pontos.filter((_, j) => j !== i))} aria-label="Remover"><Trash2 size={15} /></button>
+        {extras.map((e, i) => (
+          <div key={i} className="row">
+            <select className="grow" value={e.item_id} onChange={(ev) => setE(i, 'item_id', ev.target.value)}><option value="">Escolha o material</option>{materiais.map((m) => <option key={m.id} value={m.id}>{m.descricao}</option>)}</select>
+            <input className="qty" type="number" min="1" value={e.qtd} onChange={(ev) => setE(i, 'qtd', ev.target.value)} />
+            <button className="btn ghost small" onClick={() => setExtras(extras.filter((_, j) => j !== i))} aria-label="Remover"><Trash2 size={15} /></button>
           </div>
         ))}
       </div>
       <div className="btns" style={{ marginTop: 8 }}>
-        <button className="btn small" onClick={() => setPontos([...pontos, { ponto: `MED-${pontos.length}`, disj: pontos.at(-1)?.geral ? '' : pontos.at(-1)?.disj || '', geral: false, tc: '', ie: true }])}><Plus size={15} /> Ponto</button>
+        <button className="btn small" onClick={() => setExtras([...extras, { item_id: '', qtd: 1 }])}><Plus size={15} /> Material</button>
       </div>
       {resumo.length > 0 && <>
         <h4 className="muted" style={{ margin: '16px 0 4px' }}>Material necessário</h4>
         <div className="list">
           {resumo.map((r) => (
             <div key={r.id} className="row">
-              <div className="grow t">{item[r.id]?.descricao}</div>
+              <div className="grow t">{item[r.id]?.descricao || r.id}</div>
               <span className="num">{r.q}</span>
               {r.livre >= r.q ? <span className="pill ok">tem</span> : <span className="pill bad">comprar {r.q - Math.max(0, r.livre)}</span>}
             </div>
