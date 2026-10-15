@@ -70,7 +70,8 @@ function status(v: string) {
   const t = normal(v)
   if (!t) return ''
   if (t.includes('orc')) return 'ORCAMENTO'
-  if (t.includes('agend')) return 'AGENDADO'
+  if (t.includes('fila') || t.includes('aguard') || t.includes('a_agendar')) return 'FECHADO'
+  if (t.includes('agendad')) return 'AGENDADO'
   return 'FECHADO'
 }
 
