@@ -5,7 +5,10 @@ import { Modal, Status, useToast } from '../ui.jsx'
 
 const ABERTOS = ['ORCAMENTO', 'FECHADO', 'AGENDADO', 'EM_CAMPO']
 const PENDENTE = ['PLANEJADO', 'RESERVADO', 'SEPARADO']
-export const TIPOS_SERV = { MONITORAMENTO: 'Monitoramento', ELETROPOSTO: 'Eletroposto', OUTRO: 'Outro' }
+export const TIPOS_SERV = { MONITORAMENTO: 'Monitoramento', DIAGNOSTICO: 'Diagnóstico/SAVE', ELETROPOSTO: 'Eletroposto', OUTRO: 'Outro' }
+const semPontos = (tipo) => tipo && tipo !== 'MONITORAMENTO'
+const ROTULOS_FORM = { quadro_comum: 'Quadro comum', quadro_geral: 'Quadro geral', local_prumadas: 'Local das prumadas', qtd_apartamentos: 'Apartamentos', qtd_subsolos: 'Subsolos', sensor_fumaca: 'Sensor de fumaça', sprinklers: 'Sprinklers', persona: 'Persona', origem_lead: 'Origem do lead', data_inicio: 'Data de início' }
+const moeda = (v) => (v == null ? '' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
 const hoje = () => new Date().toISOString().slice(0, 10)
 
 export default function Servicos({ param }) {
@@ -43,7 +46,7 @@ function LinhaServico({ s }) {
     <div className="row click" onClick={() => ir('servicos', s.id)}>
       <div className="grow">
         <div className="t">{s.cliente}</div>
-        <div className="s">{s.id}{s.origem === 'CRM' ? ' · CRM' : ''}{s.tipo && s.tipo !== 'MONITORAMENTO' ? ` · ${TIPOS_SERV[s.tipo]}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {s.origem === 'CRM' && ABERTOS.includes(s.status) && !db.necessidades.some((n) => n.servico_id === s.id) ? 'definir material' : `${chk.length} itens`}{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
+        <div className="s">{s.id}{s.origem === 'CRM' ? ` · CRM${s.etapa ? ' · ' + s.etapa : ''}` : ''}{s.tipo && s.tipo !== 'MONITORAMENTO' ? ` · ${TIPOS_SERV[s.tipo]}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {s.origem === 'CRM' && ABERTOS.includes(s.status) && !db.necessidades.some((n) => n.servico_id === s.id) ? 'definir material' : `${chk.length} itens`}{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
       </div>
       {ABERTOS.includes(s.status) && chk.length > 0 && (faltam ? <AlertTriangle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#34d399" />)}
       <Status v={s.status} />
@@ -108,7 +111,7 @@ function DetalheServico({ id }) {
         <div>
           <button className="btn ghost small" style={{ marginLeft: -12 }} onClick={() => ir('servicos')}>‹ Serviços</button>
           <h1>{s.cliente}</h1>
-          <div className="sub">{s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}{s.origem === 'CRM' ? ` · veio do CRM (nº ${s.crm_id})` : ''}</div>
+          <div className="sub">{s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}</div>
         </div>
         <div className="btns">
           <button className="btn small" onClick={() => setModal('editar')}><Pencil size={15} /> Editar</button>
@@ -119,7 +122,7 @@ function DetalheServico({ id }) {
         </div>
       </div>
 
-      {s.obs && <div className="card glass"><h2>Observações</h2><div style={{ whiteSpace: 'pre-wrap' }}>{s.obs}</div></div>}
+      {s.origem === 'CRM' ? <DadosCRM s={s} /> : s.obs && <div className="card glass"><h2>Observações</h2><div style={{ whiteSpace: 'pre-wrap' }}>{s.obs}</div></div>}
 
       <ListaImpressao s={s} nec={nec} equip={db.ativos.filter((a) => a.servico_id === id)} />
 
@@ -127,7 +130,7 @@ function DetalheServico({ id }) {
         <h2 style={{ flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>Checagem antes de sair {chk.length > 0 && (faltam.length ? <span className="pill bad">{faltam.length === 1 ? 'falta 1 item' : `faltam ${faltam.length} itens`}</span> : <span className="pill ok">tudo disponível</span>)}</span>
           <span className="btns">
-            {chk.some((c) => c.aLevar > 0) && <button className="btn primary small" onClick={() => setModal('saida')}><Truck size={15} /> Registrar saída</button>}
+            {(chk.some((c) => c.aLevar > 0) || ['FECHADO', 'AGENDADO', 'EM_CAMPO'].includes(s.status)) && <button className="btn primary small" onClick={() => setModal('saida')}><Truck size={15} /> Registrar saída</button>}
             {(campo.length > 0 || equipCampo.length > 0) && <button className="btn small" onClick={() => setModal('retorno')}><Undo2 size={15} /> Registrar retorno</button>}
           </span>
         </h2>
@@ -161,14 +164,14 @@ function DetalheServico({ id }) {
       )}
 
       <div className="card glass">
-        <h2>{s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais do serviço' : 'Pontos de medição'}
+        <h2>{semPontos(s.tipo) ? 'Materiais do serviço' : 'Pontos de medição'}
           <span className="btns">
-            <button className="btn small" onClick={() => setModal('pontos')}><Plus size={15} /> {s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais' : 'Pontos'}</button>
+            <button className="btn small" onClick={() => setModal('pontos')}><Plus size={15} /> {semPontos(s.tipo) ? 'Materiais' : 'Pontos'}</button>
             <button className="btn small ghost" onClick={() => setModal('linha')}><Plus size={15} /> Item avulso</button>
           </span>
         </h2>
         <div className="list">
-          {pontos.length === 0 && <div className="empty">Sem pontos cadastrados.</div>}
+          {pontos.length === 0 && <div className="empty">{semPontos(s.tipo) ? 'Nenhum material cadastrado.' : 'Sem pontos cadastrados.'}</div>}
           {pontos.map((p) => (
             <div key={p.ponto} className="row" style={{ alignItems: 'flex-start' }}>
               <div className="grow">
@@ -252,7 +255,7 @@ function Saida({ s, chk, onClose }) {
         <label className="full">Técnico<input value={resp} onChange={(e) => setResp(e.target.value)} list="equipe-s" /></label>
         <datalist id="equipe-s">{db.equipe.map((e) => <option key={e.email} value={e.nome} />)}</datalist>
       </div>
-      <h4 className="muted" style={{ margin: '0 0 4px' }}>Materiais</h4>
+      {chk.some((c) => c.aLevar > 0) && <h4 className="muted" style={{ margin: '0 0 4px' }}>Materiais</h4>}
       <div className="list">
         {chk.filter((c) => c.aLevar > 0).map((c) => {
           const p = plano.find((x) => x.itemId === c.item_id)
@@ -392,6 +395,25 @@ function EditarServico({ s, onClose }) {
   )
 }
 
+// Dados que chegaram do card do Bitrix24
+function DadosCRM({ s }) {
+  const linhas = [
+    ['Funil', s.funil], ['Etapa no CRM', s.etapa], ['Responsável', s.contato_nome], ['Telefone', s.contato_telefone],
+    ['E-mail', s.contato_email], ['CNPJ', s.cnpj], ['Produtos', s.produtos], ['Valor', moeda(s.valor)], ['Vendedor', s.vendedor],
+    ...Object.entries(s.formulario || {}).map(([k, v]) => [ROTULOS_FORM[k] || k, v]),
+    ['Observações', s.obs],
+  ].filter(([, v]) => v)
+  return (
+    <div className="card glass">
+      <h2>Dados do CRM <span className="btns">{s.crm_link && <a className="btn small" href={s.crm_link} target="_blank" rel="noreferrer">Abrir no Bitrix</a>}</span></h2>
+      <div className="tiny" style={{ marginBottom: 6 }}>Negócio nº {s.crm_id}{s.recebido_em ? ` · atualizado ${fmtData(s.recebido_em)}` : ''}</div>
+      <div className="list">
+        {linhas.map(([k, v]) => <div key={k} className="row"><div className="grow s">{k}</div><div className="t" style={{ textAlign: 'right', whiteSpace: 'pre-wrap' }}>{v}</div></div>)}
+      </div>
+    </div>
+  )
+}
+
 // Só aparece na impressão: checklist de materiais e equipamentos para conferir na saída e no retorno
 function ListaImpressao({ s, nec, equip }) {
   const { item } = useData()
@@ -402,6 +424,7 @@ function ListaImpressao({ s, nec, equip }) {
       <img src="/logo-dark.png" alt="e-Simon" style={{ height: 36 }} />
       <h2>Lista de materiais e equipamentos</h2>
       <p><b>{s.cliente}</b> · {s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}<br />
+        {s.contato_nome ? `${s.contato_nome}${s.contato_telefone ? ' · ' + s.contato_telefone : ''}` : ''}{s.contato_nome && <br />}
         {s.endereco}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}</p>
       <table>
         <thead><tr><th>Material</th><th>Qtd</th><th>Saiu</th><th>Instalado</th><th>Voltou</th></tr></thead>
@@ -483,7 +506,7 @@ function NovoServico({ onClose, existente }) {
   const chk = (p, i, k, txt) => <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 18, height: 18 }} checked={!!p[k]} onChange={(e) => setP(i, k, e.target.checked)} />{txt}</label>
 
   return (
-    <Modal titulo={existente ? `Pontos e material · ${existente.cliente}` : 'Novo serviço'} sub={comPontos ? 'O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima.' : 'Liste o material que o serviço vai usar.'} onClose={onClose}
+    <Modal titulo={existente ? `Pontos e material · ${existente.cliente}` : 'Novo serviço'} sub={comPontos ? 'O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima.' : f.tipo === 'DIAGNOSTICO' ? 'Liste o material. Os analisadores são escolhidos na saída para campo.' : 'Liste o material que o serviço vai usar.'} onClose={onClose}
       acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.cliente || ocupado || (existente && !resumo.length)} onClick={salvar}>{existente ? 'Incluir' : 'Criar serviço'}</button></>}>
       {existente ? <div className="form"><label>Tipo de serviço<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{Object.entries(TIPOS_SERV).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label></div> : <div className="form">
         <label>Cliente / condomínio<input value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} /></label>
