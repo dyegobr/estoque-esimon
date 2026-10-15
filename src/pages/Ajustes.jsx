@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, LogOut, ArrowLeftRight, History } from 'lucide-react'
+import { Download, LogOut, ArrowLeftRight, History, Copy, RefreshCw } from 'lucide-react'
 import { useData, supabase, ir } from '../data.jsx'
 import { useToast } from '../ui.jsx'
 
@@ -10,6 +10,22 @@ export default function Ajustes() {
   const [pessoa, setPessoa] = useState({ email: '', nome: '', papel: 'TECNICO' })
   const [loc, setLoc] = useState({ id: '', nome: '', tipo: 'TECNICO' })
   const [baixando, setBaixando] = useState(false)
+  const [token, setToken] = useState(null)
+  const URL_CRM = 'https://qnqkbbhojmtsofgklsvk.supabase.co/functions/v1/receber-servico'
+
+  async function verToken() {
+    const r = await supabase.from('integracao').select('token').eq('id', 1).single()
+    if (r.error) return toast(r.error.message, true)
+    setToken(r.data.token)
+  }
+  async function novoToken() {
+    if (!confirm('Gerar um novo token? A plataforma Maker vai parar de enviar até você colar o novo token nela.')) return
+    const t = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, '0')).join('')
+    const r = await supabase.from('integracao').update({ token: t, atualizado_em: new Date().toISOString() }).eq('id', 1)
+    if (r.error) return toast(r.error.message, true)
+    setToken(t); toast('Novo token gerado')
+  }
+  const copiar = (t) => navigator.clipboard.writeText(t).then(() => toast('Copiado'))
 
   async function addPessoa() {
     const r = await supabase.from('equipe').insert({ ...pessoa, email: pessoa.email.trim().toLowerCase() })
@@ -62,6 +78,20 @@ export default function Ajustes() {
         </div>
         <div className="tiny" style={{ marginTop: 10 }}>O backup gera uma planilha com todas as tabelas. Salve na pasta Estoque Equipamentos do OneDrive.</div>
       </div>
+
+      {admin && (
+        <div className="card glass">
+          <h2>Integração com o CRM (Bitrix24 pela Maker)</h2>
+          <div className="tiny" style={{ marginBottom: 10 }}>Na Maker, crie uma chamada HTTP <b>POST</b> para o endereço abaixo, com o token no cabeçalho <b>x-token</b> (ou no fim do endereço como <b>?token=</b>). Cada negócio vira um serviço; se o mesmo negócio chegar de novo, o serviço é atualizado em vez de duplicado.</div>
+          <div className="list">
+            <div className="row"><div className="grow"><div className="s">Endereço</div><div className="t" style={{ wordBreak: 'break-all' }}>{URL_CRM}</div></div><button className="btn small" onClick={() => copiar(URL_CRM)}><Copy size={15} /> Copiar</button></div>
+            <div className="row"><div className="grow"><div className="s">Token</div><div className="t" style={{ wordBreak: 'break-all' }}>{token || '••••••••••••'}</div></div>
+              {token ? <button className="btn small" onClick={() => copiar(token)}><Copy size={15} /> Copiar</button> : <button className="btn small" onClick={verToken}>Mostrar</button>}
+              <button className="btn small ghost" onClick={novoToken} aria-label="Gerar novo token"><RefreshCw size={15} /></button></div>
+          </div>
+          <div className="tiny" style={{ marginTop: 10 }}>Campos aceitos no corpo (JSON): <b>crm_id</b> (obrigatório, id do negócio), <b>cliente</b>, <b>endereco</b>, <b>data_prevista_campo</b> (dd/mm/aaaa ou aaaa-mm-dd), <b>tipo</b> (monitoramento, eletroposto, outro), <b>status</b> (orçamento, fechado, agendado), <b>obs</b>. Nomes do Bitrix como ID, TITLE e COMMENTS também funcionam.</div>
+        </div>
+      )}
 
       <div className="grid two">
         <div className="card glass">

@@ -43,7 +43,7 @@ function LinhaServico({ s }) {
     <div className="row click" onClick={() => ir('servicos', s.id)}>
       <div className="grow">
         <div className="t">{s.cliente}</div>
-        <div className="s">{s.id}{s.tipo && s.tipo !== 'MONITORAMENTO' ? ` · ${TIPOS_SERV[s.tipo]}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {chk.length} itens{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
+        <div className="s">{s.id}{s.origem === 'CRM' ? ' · CRM' : ''}{s.tipo && s.tipo !== 'MONITORAMENTO' ? ` · ${TIPOS_SERV[s.tipo]}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''} · {s.origem === 'CRM' && ABERTOS.includes(s.status) && !db.necessidades.some((n) => n.servico_id === s.id) ? 'definir material' : `${chk.length} itens`}{ABERTOS.includes(s.status) && chk.length ? (faltam ? ` · faltam ${faltam}` : ' · material ok') : ''}</div>
       </div>
       {ABERTOS.includes(s.status) && chk.length > 0 && (faltam ? <AlertTriangle size={18} color="#f87171" /> : <CheckCircle2 size={18} color="#34d399" />)}
       <Status v={s.status} />
@@ -108,7 +108,7 @@ function DetalheServico({ id }) {
         <div>
           <button className="btn ghost small" style={{ marginLeft: -12 }} onClick={() => ir('servicos')}>‹ Serviços</button>
           <h1>{s.cliente}</h1>
-          <div className="sub">{s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}</div>
+          <div className="sub">{s.id} · {TIPOS_SERV[s.tipo] || 'Monitoramento'}{s.endereco ? ` · ${s.endereco}` : ''}{s.data_prevista_campo ? ` · campo ${fmtData(s.data_prevista_campo)}` : ''}{s.data_instalacao ? ` · instalado em ${fmtData(s.data_instalacao)}` : ''}{s.origem === 'CRM' ? ` · veio do CRM (nº ${s.crm_id})` : ''}</div>
         </div>
         <div className="btns">
           <button className="btn small" onClick={() => setModal('editar')}><Pencil size={15} /> Editar</button>
@@ -118,6 +118,8 @@ function DetalheServico({ id }) {
           </select>
         </div>
       </div>
+
+      {s.obs && <div className="card glass"><h2>Observações</h2><div style={{ whiteSpace: 'pre-wrap' }}>{s.obs}</div></div>}
 
       <ListaImpressao s={s} nec={nec} equip={db.ativos.filter((a) => a.servico_id === id)} />
 
@@ -159,7 +161,12 @@ function DetalheServico({ id }) {
       )}
 
       <div className="card glass">
-        <h2>{s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais do serviço' : 'Pontos de medição'} <button className="btn small" onClick={() => setModal('linha')}><Plus size={15} /> Material</button></h2>
+        <h2>{s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais do serviço' : 'Pontos de medição'}
+          <span className="btns">
+            <button className="btn small" onClick={() => setModal('pontos')}><Plus size={15} /> {s.tipo === 'ELETROPOSTO' || s.tipo === 'OUTRO' ? 'Materiais' : 'Pontos'}</button>
+            <button className="btn small ghost" onClick={() => setModal('linha')}><Plus size={15} /> Item avulso</button>
+          </span>
+        </h2>
         <div className="list">
           {pontos.length === 0 && <div className="empty">Sem pontos cadastrados.</div>}
           {pontos.map((p) => (
@@ -182,6 +189,7 @@ function DetalheServico({ id }) {
       {modal === 'saida' && <Saida s={s} chk={chk} onClose={() => setModal(null)} />}
       {modal === 'retorno' && <Retorno s={s} campo={campo} equip={equipCampo} onClose={() => setModal(null)} />}
       {modal === 'linha' && <NovaLinha s={s} onClose={() => setModal(null)} />}
+      {modal === 'pontos' && <NovoServico existente={s} onClose={() => setModal(null)} />}
       {modal === 'editar' && <EditarServico s={s} onClose={() => setModal(null)} />}
     </>
   )
@@ -414,11 +422,15 @@ function ListaImpressao({ s, nec, equip }) {
   )
 }
 
-function NovoServico({ onClose }) {
+// Sem "existente": cria serviço novo. Com "existente" (ex.: veio do CRM): só acrescenta pontos e material a ele.
+function NovoServico({ onClose, existente }) {
   const { db, item, load } = useData()
   const toast = useToast()
-  const [f, setF] = useState({ cliente: '', endereco: '', data_prevista_campo: '', status: 'FECHADO', tipo: 'MONITORAMENTO' })
-  const [pontos, setPontos] = useState([{ ponto: 'GERAL', disj: '', geral: true, tc: '', ie: true, dj: false, reset: false }])
+  const [f, setF] = useState(existente
+    ? { cliente: existente.cliente, endereco: existente.endereco || '', data_prevista_campo: existente.data_prevista_campo || '', status: existente.status, tipo: existente.tipo || 'MONITORAMENTO' }
+    : { cliente: '', endereco: '', data_prevista_campo: '', status: 'FECHADO', tipo: 'MONITORAMENTO' })
+  const jaTemGeral = existente && db.necessidades.some((n) => n.servico_id === existente.id && n.ponto === 'GERAL')
+  const [pontos, setPontos] = useState([jaTemGeral ? { ponto: 'MED-1', disj: '', geral: false, tc: '', ie: true, dj: false, reset: false } : { ponto: 'GERAL', disj: '', geral: true, tc: '', ie: true, dj: false, reset: false }])
   const [extras, setExtras] = useState([])
   const [ocupado, setOcupado] = useState(false)
   const tcs = db.itens.filter((i) => i.categoria === 'TC')
@@ -447,8 +459,10 @@ function NovoServico({ onClose }) {
 
   async function salvar() {
     setOcupado(true)
-    const id = await proximoIdServico()
-    let r = await supabase.from('servicos').insert({ id, ...f, data_prevista_campo: f.data_prevista_campo || null, data_fechamento: hoje() })
+    const id = existente ? existente.id : await proximoIdServico()
+    let r = existente
+      ? await supabase.from('servicos').update({ tipo: f.tipo }).eq('id', id)
+      : await supabase.from('servicos').insert({ id, ...f, data_prevista_campo: f.data_prevista_campo || null, data_fechamento: hoje() })
     if (!r.error) {
       const nec = []
       for (const p of linhas) {
@@ -463,21 +477,21 @@ function NovoServico({ onClose }) {
     }
     setOcupado(false)
     if (r.error) return toast(r.error.message, true)
-    toast('Serviço criado'); await load(); onClose(); ir('servicos', id)
+    toast(existente ? 'Material incluído' : 'Serviço criado'); await load(); onClose(); ir('servicos', id)
   }
 
   const chk = (p, i, k, txt) => <label style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 18, height: 18 }} checked={!!p[k]} onChange={(e) => setP(i, k, e.target.checked)} />{txt}</label>
 
   return (
-    <Modal titulo="Novo serviço" sub={comPontos ? 'O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima.' : 'Liste o material que o serviço vai usar.'} onClose={onClose}
-      acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.cliente || ocupado} onClick={salvar}>Criar serviço</button></>}>
-      <div className="form">
+    <Modal titulo={existente ? `Pontos e material · ${existente.cliente}` : 'Novo serviço'} sub={comPontos ? 'O TC é sugerido pelo disjuntor: geral usa bipartido, os demais janela, sempre o próximo tamanho acima.' : 'Liste o material que o serviço vai usar.'} onClose={onClose}
+      acoes={<><button className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={!f.cliente || ocupado || (existente && !resumo.length)} onClick={salvar}>{existente ? 'Incluir' : 'Criar serviço'}</button></>}>
+      {existente ? <div className="form"><label>Tipo de serviço<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{Object.entries(TIPOS_SERV).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label></div> : <div className="form">
         <label>Cliente / condomínio<input value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} /></label>
         <label>Tipo de serviço<select value={f.tipo} onChange={(e) => setF({ ...f, tipo: e.target.value })}>{Object.entries(TIPOS_SERV).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label>
         <label>Data prevista de campo<input type="date" value={f.data_prevista_campo} onChange={(e) => setF({ ...f, data_prevista_campo: e.target.value })} /></label>
         <label>Situação<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="ORCAMENTO">Orçamento (não reserva)</option><option value="FECHADO">Fechado</option><option value="AGENDADO">Agendado</option></select></label>
         <label className="full">Endereço<input value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /></label>
-      </div>
+      </div>}
       {comPontos && <>
         <h4 className="muted" style={{ margin: '16px 0 4px' }}>Pontos de medição</h4>
         <div className="list">
