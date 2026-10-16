@@ -4,11 +4,16 @@
     <meta charset="UTF-8" />
     <script>try{document.documentElement.dataset.theme=localStorage.getItem("tema")||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}catch(e){}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#06121f" />
+    <meta name="theme-color" content="#eaf3fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#06121f" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Estoque e-Simon</title>
-    <link rel="icon" href="/logo.png" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>e-Simon</title>
+    <link rel="icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="e-Simon" />
+    <meta name="mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <div id="root"></div>
