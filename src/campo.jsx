@@ -31,14 +31,14 @@ export function faltando(campos, dados, prefixo = '') {
 }
 
 // Reduz a foto antes de enviar: o técnico usa o próprio plano de dados
-async function reduzir(file, max = 1600) {
+async function reduzir(file, max = 1280) {
   const img = await createImageBitmap(file).catch(() => null)
   if (!img) return file
   const k = Math.min(1, max / Math.max(img.width, img.height))
   const cv = document.createElement('canvas')
   cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k)
   cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height)
-  return new Promise((res) => cv.toBlob((b) => res(b || file), 'image/jpeg', 0.8))
+  return new Promise((res) => cv.toBlob((b) => res(b || file), 'image/jpeg', 0.72))
 }
 
 export async function enviarArquivo(visitaId, blob, ext = 'jpg') {
