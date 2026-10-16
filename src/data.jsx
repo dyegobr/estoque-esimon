@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
+export const TIPOS_SERV = { MONITORAMENTO: 'Monitoramento', DIAGNOSTICO: 'Diagnóstico/SAVE', ELETROPOSTO: 'Eletroposto', OUTRO: 'Outro' }
+
 export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY)
 
 const Ctx = createContext(null)
@@ -17,6 +19,9 @@ const TABELAS = {
   compras: () => supabase.from('compras').select('*').order('created_at', { ascending: false }),
   movs: () => supabase.from('movimentacoes').select('*').order('data_hora', { ascending: false }).limit(1000),
   equipe: () => supabase.from('equipe').select('*').order('nome'),
+  visitas: () => supabase.from('visitas').select('*').order('inicio'),
+  modelos: () => supabase.from('modelos_formulario').select('*').order('nome'),
+  tiposVisita: () => supabase.from('tipos_visita').select('*').order('nome'),
 }
 
 export function DataProvider({ session, children }) {
@@ -36,7 +41,7 @@ export function DataProvider({ session, children }) {
     load()
     // Tempo real: qualquer mudança de outra pessoa recarrega a tela
     const ch = supabase.channel('estoque')
-    for (const t of ['movimentacoes', 'ativos', 'servicos', 'necessidades', 'compras', 'itens']) {
+    for (const t of ['movimentacoes', 'ativos', 'servicos', 'necessidades', 'compras', 'itens', 'visitas']) {
       ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => {
         clearTimeout(timer.current)
         timer.current = setTimeout(load, 400)

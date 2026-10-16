@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2, CheckCircle2, AlertTriangle, Truck, Undo2, Printer, Pencil } from 'lucide-react'
-import { useData, ir, supabase, sugerirTC, proximoIdServico, fmtData, desde } from '../data.jsx'
+import { useData, ir, supabase, sugerirTC, proximoIdServico, fmtData, desde, TIPOS_SERV } from '../data.jsx'
+import { LinhaVisita, EditarVisita } from './Agenda.jsx'
 import { Modal, Status, useToast } from '../ui.jsx'
 
 const ABERTOS = ['ORCAMENTO', 'FECHADO', 'AGENDADO', 'EM_CAMPO']
 const PENDENTE = ['PLANEJADO', 'RESERVADO', 'SEPARADO']
-export const TIPOS_SERV = { MONITORAMENTO: 'Monitoramento', DIAGNOSTICO: 'Diagnóstico/SAVE', ELETROPOSTO: 'Eletroposto', OUTRO: 'Outro' }
+export { TIPOS_SERV }
 const semPontos = (tipo) => tipo && tipo !== 'MONITORAMENTO'
 const ROTULOS_FORM = { quadro_comum: 'Quadro comum', quadro_geral: 'Quadro geral', local_prumadas: 'Local das prumadas', qtd_apartamentos: 'Apartamentos', qtd_subsolos: 'Subsolos', sensor_fumaca: 'Sensor de fumaça', sprinklers: 'Sprinklers', persona: 'Persona', origem_lead: 'Origem do lead', data_inicio: 'Data de início' }
 const moeda = (v) => (v == null ? '' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }))
@@ -123,6 +124,8 @@ function DetalheServico({ id }) {
       </div>
 
       {s.origem === 'CRM' ? <DadosCRM s={s} /> : s.obs && <div className="card glass"><h2>Observações</h2><div style={{ whiteSpace: 'pre-wrap' }}>{s.obs}</div></div>}
+
+      <VisitasDoServico s={s} />
 
       <ListaImpressao s={s} nec={nec} equip={db.ativos.filter((a) => a.servico_id === id)} />
 
@@ -563,5 +566,22 @@ function NovoServico({ onClose, existente }) {
         </div>
       </>}
     </Modal>
+  )
+}
+
+// Visitas de campo deste serviço e o que foi registrado em cada uma
+function VisitasDoServico({ s }) {
+  const { db } = useData()
+  const [modal, setModal] = useState(null)
+  const vs = db.visitas.filter((v) => v.servico_id === s.id && v.status !== 'CANCELADA').sort((a, b) => b.inicio.localeCompare(a.inicio))
+  return (
+    <div className="card glass">
+      <h2>Visitas de campo <button className="btn small" onClick={() => setModal({ novo: { servico_id: s.id, dia: s.data_prevista_campo || '' } })}><Plus size={15} /> Agendar visita</button></h2>
+      {vs.length === 0 ? <div className="empty">{ABERTOS.includes(s.status) ? 'Aguardando técnico: nenhuma visita marcada.' : 'Nenhuma visita registrada.'}</div> : (
+        <div className="list">{vs.map((v) => <LinhaVisita key={v.id} v={v} comData semCliente onClick={() => setModal({ visita: v })} />)}</div>
+      )}
+      {modal?.novo && <EditarVisita inicial={modal.novo} onClose={() => setModal(null)} />}
+      {modal?.visita && <EditarVisita visita={modal.visita} onClose={() => setModal(null)} />}
+    </div>
   )
 }

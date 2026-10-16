@@ -99,7 +99,7 @@ export default function Ajustes() {
           <div className="list">
             {db.equipe.map((p) => (
               <div key={p.email} className="row">
-                <div className="grow"><div className="t">{p.nome}</div><div className="s">{p.email} · {p.papel === 'ADMIN' ? 'administrador' : 'técnico'}</div></div>
+                <div className="grow"><div className="t">{p.nome}</div><div className="s">{p.email} · {{ ADMIN: 'administrador', TECNICO: 'técnico interno', EXTERNO: 'técnico externo (só vê a própria agenda)' }[p.papel]}</div></div>
                 {admin && p.email !== me.email && <button className="btn small" onClick={() => alternar(p)}>{p.ativo ? 'Desativar' : 'Reativar'}</button>}
                 {!p.ativo && <span className="pill">inativo</span>}
               </div>
@@ -109,7 +109,7 @@ export default function Ajustes() {
             <div className="form" style={{ marginTop: 14 }}>
               <label>Nome<input value={pessoa.nome} onChange={(e) => setPessoa({ ...pessoa, nome: e.target.value })} /></label>
               <label>E-mail<input type="email" value={pessoa.email} onChange={(e) => setPessoa({ ...pessoa, email: e.target.value })} /></label>
-              <label>Papel<select value={pessoa.papel} onChange={(e) => setPessoa({ ...pessoa, papel: e.target.value })}><option value="TECNICO">Técnico</option><option value="ADMIN">Administrador</option></select></label>
+              <label>Papel<select value={pessoa.papel} onChange={(e) => setPessoa({ ...pessoa, papel: e.target.value })}><option value="TECNICO">Técnico interno</option><option value="EXTERNO">Técnico externo</option><option value="ADMIN">Administrador</option></select></label>
               <label>&nbsp;<button className="btn primary" disabled={!pessoa.email || !pessoa.nome} onClick={addPessoa}>Incluir na equipe</button></label>
             </div>
           )}

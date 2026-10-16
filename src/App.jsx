@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutGrid, Boxes, Gauge, ClipboardList, ShoppingCart, History, Settings, LogOut, ArrowLeftRight, Sun, Moon } from 'lucide-react'
+import { LayoutGrid, Boxes, Gauge, ClipboardList, ShoppingCart, History, Settings, LogOut, ArrowLeftRight, Sun, Moon, CalendarDays, FileText, MapPinned } from 'lucide-react'
 import { DataProvider, supabase, useData, ir } from './data.jsx'
 import { ToastProvider } from './ui.jsx'
 import { useTema, BotaoTema } from './theme.jsx'
@@ -12,14 +12,20 @@ import Compras from './pages/Compras.jsx'
 import Historico from './pages/Historico.jsx'
 import Movimentar from './pages/Movimentar.jsx'
 import Ajustes from './pages/Ajustes.jsx'
+import Agenda from './pages/Agenda.jsx'
+import Formularios from './pages/Formularios.jsx'
+import MinhaAgenda from './pages/MinhaAgenda.jsx'
 
 const PAGINAS = [
   { id: 'painel', nome: 'Painel', curto: 'Painel', icone: LayoutGrid, C: Painel },
+  { id: 'agenda', nome: 'Agenda', curto: 'Agenda', icone: CalendarDays, C: Agenda },
   { id: 'servicos', nome: 'Serviços', curto: 'Serviços', icone: ClipboardList, C: Servicos },
   { id: 'estoque', nome: 'Materiais', curto: 'Materiais', icone: Boxes, C: Estoque },
   { id: 'equipamentos', nome: 'Equipamentos', curto: 'Equip.', icone: Gauge, C: Equipamentos },
   { id: 'compras', nome: 'Compras', curto: 'Compras', icone: ShoppingCart, C: Compras },
   { id: 'movimentar', nome: 'Movimentar', curto: 'Mover', icone: ArrowLeftRight, C: Movimentar, soDesktop: true },
+  { id: 'formularios', nome: 'Formulários', curto: 'Form.', icone: FileText, C: Formularios, soDesktop: true },
+  { id: 'campo', nome: 'Minha agenda', curto: 'Campo', icone: MapPinned, C: MinhaAgenda, soComVisita: true },
   { id: 'historico', nome: 'Histórico', curto: 'Histórico', icone: History, C: Historico, soDesktop: true },
   { id: 'ajustes', nome: 'Ajustes', curto: 'Ajustes', icone: Settings, C: Ajustes, soDesktop: true },
 ]
@@ -52,13 +58,18 @@ function Shell({ session, tema, alternar }) {
     )
   }
 
+  if (me.papel === 'EXTERNO') return <CampoShell rota={rota} tema={tema} alternar={alternar} nome={nomeUsuario} />
+
+  // "Minha agenda" só aparece para quem tem visita marcada no próprio nome
+  const minhas = db.visitas.some((v) => v.tecnico_email.toLowerCase() === me.email.toLowerCase())
+  const paginas = PAGINAS.filter((p) => !p.soComVisita || minhas)
   const pag = PAGINAS.find((p) => p.id === rota.pagina)
   const P = pag.C
   return (
     <div className="shell">
       <aside className="side glass">
         <img className="logo logo-img" src="/logo.png" alt="e-Simon" />
-        {PAGINAS.map((p) => (
+        {paginas.map((p) => (
           <button key={p.id} className={`navbtn ${p.id === rota.pagina ? 'on' : ''}`} onClick={() => ir(p.id)}>
             <p.icone size={19} strokeWidth={1.9} /> {p.nome}
           </button>
@@ -73,13 +84,26 @@ function Shell({ session, tema, alternar }) {
         <P param={rota.param} />
       </main>
       <nav className="tabbar glass">
-        {PAGINAS.filter((p) => !p.soDesktop).concat(PAGINAS.find((p) => p.id === 'ajustes')).map((p) => (
+        {paginas.filter((p) => !p.soDesktop && !p.soComVisita).concat(PAGINAS.find((p) => p.id === 'ajustes')).map((p) => (
           <button key={p.id} className={p.id === rota.pagina ? 'on' : ''} onClick={() => ir(p.id)}>
             <p.icone size={20} strokeWidth={1.9} />
             {p.curto}
           </button>
         ))}
       </nav>
+    </div>
+  )
+}
+
+// Técnico externo: só a própria agenda, sem estoque, compras ou valores
+function CampoShell({ rota, tema, alternar, nome }) {
+  return (
+    <div className="shell campo-shell">
+      <BotaoTema tema={tema} alternar={alternar} className="theme-fab always" />
+      <main className="main">
+        <MinhaAgenda param={rota.pagina === 'campo' ? rota.param : null} />
+        <div className="tiny" style={{ textAlign: 'center', margin: '24px 0 8px' }}>{nome} · <button className="btn ghost small" onClick={() => supabase.auth.signOut()}><LogOut size={14} /> Sair</button></div>
+      </main>
     </div>
   )
 }
