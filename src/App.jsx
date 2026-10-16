@@ -15,6 +15,7 @@ import Ajustes from './pages/Ajustes.jsx'
 import Agenda from './pages/Agenda.jsx'
 import Formularios from './pages/Formularios.jsx'
 import MinhaAgenda from './pages/MinhaAgenda.jsx'
+import ConviteInstalar from './instalar.jsx'
 
 const PAGINAS = [
   { id: 'painel', nome: 'Painel', curto: 'Painel', icone: LayoutGrid, C: Painel },
@@ -81,6 +82,7 @@ function Shell({ session, tema, alternar }) {
       </aside>
       <BotaoTema tema={tema} alternar={alternar} className="theme-fab" />
       <main className="main">
+        <ConviteInstalar />
         <P param={rota.param} />
       </main>
       <nav className="tabbar glass">
@@ -101,6 +103,7 @@ function CampoShell({ rota, tema, alternar, nome }) {
     <div className="shell campo-shell">
       <BotaoTema tema={tema} alternar={alternar} className="theme-fab always" />
       <main className="main">
+        <ConviteInstalar />
         <MinhaAgenda param={rota.pagina === 'campo' ? rota.param : null} />
         <div className="tiny" style={{ textAlign: 'center', margin: '24px 0 8px' }}>{nome} · <button className="btn ghost small" onClick={() => supabase.auth.signOut()}><LogOut size={14} /> Sair</button></div>
       </main>
